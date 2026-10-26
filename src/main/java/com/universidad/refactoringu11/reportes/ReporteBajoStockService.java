@@ -1,10 +1,12 @@
 package com.universidad.refactoringu11.reportes;
 
 import com.universidad.refactoringu11.inventario.InventarioService;
+import com.universidad.refactoringu11.inventario.NotificadorBajoStock;
+import com.universidad.refactoringu11.inventario.Producto;
 import org.springframework.stereotype.Service;
 
 @Service
-public class ReporteBajoStockService {
+public class ReporteBajoStockService implements NotificadorBajoStock {
 
     private final InventarioService inventarioService;
 
@@ -12,9 +14,14 @@ public class ReporteBajoStockService {
         this.inventarioService = inventarioService;
     }
 
+    @Override
+    public void notificar(Producto producto, int cantidadReorden) {
+        // registrar la alerta para incluirla en el proximo generarReporte()
+        // (implementacion a cargo del estudiante)
+    }
+
     public String generarReporte() {
-        // recorre los productos bajo stock minimo expuestos por InventarioService
-        // y arma un reporte de texto plano (implementacion a cargo del estudiante)
+        // implementacion a cargo del estudiante
         return "Reporte de bajo stock pendiente de implementar";
     }
 }
