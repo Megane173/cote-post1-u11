@@ -1,6 +1,7 @@
 package com.universidad.refactoringu11.inventario;
 
 import org.springframework.stereotype.Service;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,50 +15,101 @@ public class InventarioService {
         productos.add(producto);
     }
 
-    // Long Method: valida, busca, actualiza stock, calcula reorden
-    // y registra/alerta, todo en un solo metodo (Bloater)
-    public String actualizarInventario(Long productoId, int cantidad, String tipoMovimiento) {
+    public String actualizarInventario(
+            Long productoId, int cantidad, String tipoMovimiento) {
 
-        // Validacion de entrada (deberia ser responsabilidad propia)
-        if (productoId == null || cantidad == 0
-                || (!tipoMovimiento.equals("ENTRADA") && !tipoMovimiento.equals("SALIDA"))) {
+        if (!datosValidos(productoId, cantidad, tipoMovimiento)) {
             return "ERROR_DATOS_INVALIDOS";
         }
 
-        // Busqueda del producto (mezclada con la logica de negocio)
-        Producto producto = null;
-        for (Producto p : productos) {
-            if (p.getId().equals(productoId)) { producto = p; break; }
+        Producto producto = buscarProducto(productoId);
+        if (producto == null) {
+            return "ERROR_PRODUCTO_NO_EXISTE";
         }
-        if (producto == null) return "ERROR_PRODUCTO_NO_EXISTE";
 
-        // Actualizacion de stock
-        int nuevoStock;
-        if (tipoMovimiento.equals("ENTRADA")) {
-            nuevoStock = producto.getStock() + cantidad;
-        } else {
-            nuevoStock = producto.getStock() - cantidad;
-            if (nuevoStock < 0) return "ERROR_STOCK_INSUFICIENTE";
+        Integer nuevoStock = calcularNuevoStock(
+                producto, cantidad, tipoMovimiento);
+
+        if (nuevoStock == null) {
+            return "ERROR_STOCK_INSUFICIENTE";
         }
+
         producto.setStock(nuevoStock);
 
-        // Calculo de cantidad de reorden (otra responsabilidad distinta)
-        boolean necesitaReorden = nuevoStock < producto.getStockMinimo();
+        boolean necesitaReorden =
+                nuevoStock < producto.getStockMinimo();
+
         int cantidadReorden = necesitaReorden
-                ? (producto.getStockMinimo() * 3) - nuevoStock : 0;
+                ? calcularCantidadReorden(producto, nuevoStock)
+                : 0;
 
-        // Registro del movimiento (responsabilidad de auditoria)
-        String registro = tipoMovimiento + " de " + cantidad + " unidades de "
-                + producto.getNombre() + " -> stock final: " + nuevoStock;
-        movimientos.add(registro);
-        System.out.println(registro);
+        registrarMovimiento(producto, cantidad, tipoMovimiento, nuevoStock);
 
-        // Decision de alerta (responsabilidad de notificacion)
         if (necesitaReorden) {
-            System.out.println("ALERTA: " + producto.getNombre()
-                    + " bajo stock minimo. Reordenar " + cantidadReorden + " unidades.");
+            emitirAlerta(producto, cantidadReorden);
             return "OK_BAJO_STOCK_REORDEN_" + cantidadReorden;
         }
+
         return "OK_" + nuevoStock;
+    }
+
+    private boolean datosValidos(
+            Long productoId, int cantidad, String tipoMovimiento) {
+
+        return productoId != null
+                && cantidad != 0
+                && (tipoMovimiento.equals("ENTRADA")
+                || tipoMovimiento.equals("SALIDA"));
+    }
+
+    private Producto buscarProducto(Long productoId) {
+        for (Producto producto : productos) {
+            if (producto.getId().equals(productoId)) {
+                return producto;
+            }
+        }
+        return null;
+    }
+
+    private Integer calcularNuevoStock(
+            Producto producto, int cantidad, String tipoMovimiento) {
+
+        if (tipoMovimiento.equals("ENTRADA")) {
+            return producto.getStock() + cantidad;
+        }
+
+        int nuevoStock = producto.getStock() - cantidad;
+
+        if (nuevoStock < 0) {
+            return null;
+        }
+
+        return nuevoStock;
+    }
+
+    private int calcularCantidadReorden(
+            Producto producto, int nuevoStock) {
+
+        return (producto.getStockMinimo() * 3) - nuevoStock;
+    }
+
+    private void registrarMovimiento(
+            Producto producto,
+            int cantidad,
+            String tipoMovimiento,
+            int nuevoStock) {
+
+        String registro = tipoMovimiento + " de " + cantidad
+                + " unidades de " + producto.getNombre()
+                + " -> stock final: " + nuevoStock;
+
+        movimientos.add(registro);
+        System.out.println(registro);
+    }
+
+    private void emitirAlerta(Producto producto, int cantidadReorden) {
+        System.out.println("ALERTA: " + producto.getNombre()
+                + " bajo stock minimo. Reordenar "
+                + cantidadReorden + " unidades.");
     }
 }
