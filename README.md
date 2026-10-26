@@ -36,3 +36,50 @@ Este resultado corresponde al código final. Para documentar los resultados ante
 **Decisión 1: mantener el cálculo de reorden como método privado.** Se eligió esta alternativa porque la fórmula es sencilla, solo se utiliza dentro de `InventarioService` y no tiene actualmente una razón de cambio independiente. Así se evita crear una clase adicional sin necesidad ni exponer el cálculo a otros componentes. Si la lógica se vuelve más compleja o necesita reutilizarse, se podrá extraer a una clase colaboradora.
 
 **Decisión 2: utilizar un `enum` con métodos abstractos.** Se eligió esta alternativa porque los tipos de producto constituyen un conjunto cerrado y cada uno tiene sus propias reglas de recargo y etiquetado. Implementar ambos comportamientos en las constantes de `TipoProducto` elimina los `switch` duplicados sin añadir una jerarquía de clases. Si posteriormente se requieren dependencias inyectadas por Spring para cada comportamiento, se podrá evaluar el uso de estrategias independientes.
+
+# Diagnóstico de dependencia cíclica entre paquetes
+
+## 1. Problema detectado
+
+Se ejecutó la prueba de arquitectura con el comando:
+
+```bash
+mvn test -Dtest=ArquitecturaPaquetesTest
+```
+
+La prueba `losPaquetesNoDebenTenerDependenciasCiclicas` falló porque ArchUnit detectó una dependencia cíclica entre los paquetes `inventario` y `reportes`.
+
+El resultado relevante fue:
+
+```text
+Architecture Violation [Priority: MEDIUM]
+Cycle detected: Slice inventario ->
+                Slice reportes ->
+                Slice inventario
+
+Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+BUILD FAILURE
+```
+
+## 2. Evidencia del acoplamiento
+
+El ciclo se produce por las siguientes dependencias:
+
+- **`inventario → reportes`:** `InventarioService` mantiene una referencia a `ReporteBajoStockService`, recibe esta clase mediante un método setter y llama a `generarReporte()` durante `actualizarInventario()`.
+- **`reportes → inventario`:** `ReporteBajoStockService` recibe `InventarioService` en su constructor y mantiene una referencia a este servicio.
+
+Por tanto, ambos paquetes dependen directamente del otro. Esto genera un ciclo de dependencias que dificulta la separación de responsabilidades y aumenta el acoplamiento entre los componentes.
+
+## 3. Diagrama de dependencias
+
+El siguiente diagrama representa la situación identificada antes de resolver el problema:
+
+![Diagrama de dependencias cíclicas entre los paquetes inventario y reportes (antes de la refactorización)](docs/diagramaDePaquetes.png)
+
+Las flechas en sentidos opuestos representan el ciclo detectado por ArchUnit.
+
+## 4. Registro de la prueba en rojo
+
+La ejecución de `ArquitecturaPaquetesTest` constituye la evidencia inicial del problema arquitectónico. El test establece que los paquetes deben estar libres de dependencias cíclicas, pero el código original incumple esa regla.
+
+Se debe conservar el commit que contiene la prueba fallida como punto de referencia antes de aplicar la solución. De esta forma, queda documentado el diagnóstico inicial y se puede comparar con el resultado posterior a la refactorización.
