@@ -70,7 +70,7 @@ El ciclo se produce por las siguientes dependencias:
 
 Por tanto, ambos paquetes dependen directamente del otro. Esto genera un ciclo de dependencias que dificulta la separación de responsabilidades y aumenta el acoplamiento entre los componentes.
 
-## 3. Diagrama de dependencias
+## 3. Diagrama de paquetes
 
 El siguiente diagrama representa la situación identificada antes de resolver el problema:
 
@@ -83,3 +83,19 @@ Las flechas en sentidos opuestos representan el ciclo detectado por ArchUnit.
 La ejecución de `ArquitecturaPaquetesTest` constituye la evidencia inicial del problema arquitectónico. El test establece que los paquetes deben estar libres de dependencias cíclicas, pero el código original incumple esa regla.
 
 Se debe conservar el commit que contiene la prueba fallida como punto de referencia antes de aplicar la solución. De esta forma, queda documentado el diagnóstico inicial y se puede comparar con el resultado posterior a la refactorización.
+
+### Decisión de diseño 3: Ubicación de la interfaz `NotificadorBajoStock`
+
+La interfaz `NotificadorBajoStock` se ubica en `inventario` porque este paquete contiene la lógica central del sistema y tiene un mayor nivel de abstracción que `reportes`,el cual esta encargado de generar los reportes del inventario.
+
+De esta forma, `InventarioService` depende de la interfaz, mientras que `ReporteBajoStockService` la implementa. Así, el dominio no depende directamente de una implementación de reportes, se reduce el acoplamiento y se rompe el ciclo de dependencias.
+
+#### Diagrama de paquetes de resultado de refactorizacion descrita en decisión de diseño 3
+
+![Diagrama de dependencias entre los paquetes inventario y reportes (despues de la refactorización)](docs/diagramaDePaquetesDespues.png)
+
+### Decisión de diseño 4: Granularidad de la notificación
+
+Se eligió `notificar(Producto, cantidadReorden)` porque `actualizarInventario()` procesa un solo producto por llamada. La notificación por evento permite informar de manera específica qué producto requiere reabastecimiento y en qué cantidad, manteniendo una interfaz sencilla y coherente con el flujo actual.
+
+Una notificación por lote, como `notificar(List<Producto>)`, sería preferible si una operación modificara varios productos, por ejemplo, durante una compra masiva o una actualización de inventario, ya que permitiría agrupar las alertas y reducir las llamadas al notificador.
